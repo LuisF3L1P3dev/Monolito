@@ -16,6 +16,12 @@ class Pedido(models.Model):
     def __str__(self):
         return f"Pedido #{self.id} - {self.status}"
 
+    def calcular_total(self):
+        # Soma o valor de todos os itens associados ao pedido
+        novo_total = sum(item.item_cardapio.preco * item.quantidade for item in self.itens.all())
+        self.total = novo_total
+        self.save(update_fields=['total'])
+
 class ItemPedido(models.Model):
     pedido = models.ForeignKey(Pedido, related_name='itens', on_delete=models.CASCADE)
     item_cardapio = models.ForeignKey(ItemCardapio, on_delete=models.PROTECT)
@@ -23,3 +29,12 @@ class ItemPedido(models.Model):
     
     def __str__(self):
         return f"{self.quantidade}x {self.item_cardapio.nome} (Pedido #{self.pedido.id})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.pedido.calcular_total()
+
+    def delete(self, *args, **kwargs):
+        pedido = self.pedido
+        super().delete(*args, **kwargs)
+        pedido.calcular_total()
