@@ -39,7 +39,7 @@ python test_modular_logic.py
 4. Na lista de pedidos, selecione o pedido e use a ação: **"Processar Pagamento (Via Services Modular)"**.
 5. Observe o delay de 5s (Pagamento Padrão) e a notificação automática enviada à cozinha.
 
-### 3. O Experimento de Troca (Mandatório)
+### 3. O Experimento de Troca 
 Para validar o baixo acoplamento:
 1. Abra `pagamento/views.py`.
 2. Troque a linha `pagamento_service = PagamentoPadraoService()` por `pagamento_service = PagamentoRapidoService()`.
@@ -85,5 +85,3 @@ Quais módulos poderiam virar serviços independentes amanhã?
 O que falta para isso?
 1. **Infraestrutura de Rede:** Substituir as chamadas de método em `services.py` por chamadas HTTP (REST) ou gRPC.
 2. **Mensageria:** Implementar um Broker (como RabbitMQ ou Kafka) para que a `notificacao` reaja a eventos de "PagamentoConfirmado" em vez de ser chamada sincronicamente.
-3. **Gerenciamento de Transações:** Implementar o padrão Saga ou compensações, já que não haverá mais transação de banco de dados única (ACID) entre módulos.
-4. **Descoberta de Serviços:** Um mecanismo para localizar onde cada serviço está rodando.
