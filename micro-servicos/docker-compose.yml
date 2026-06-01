@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  servico-cardapio:
+    build: ./servico-cardapio
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+    volumes:
+      - cardapio_db:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  servico-pedidos:
+    build: ./servico-pedidos
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - CARDAPIO_URL=http://servico-cardapio:8002
+      - PAGAMENTO_URL=http://servico-pagamento:8003
+    volumes:
+      - pedidos_db:/app/data
+    depends_on:
+      servico-cardapio:
+        condition: service_healthy
+      servico-pagamento:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  servico-pagamento:
+    build: ./servico-pagamento
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - pagamento_db:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  servico-notificacao:
+    build: ./servico-notificacao
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - notificacao_db:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Worker que consome a fila RabbitMQ e registra notificações
+  notificacao-worker:
+    build: ./servico-notificacao
+    command: sh -c "python manage.py migrate --noinput && python manage.py consumir_fila"
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    volumes:
+      - notificacao_db:/app/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      servico-notificacao:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  cardapio_db:
+  pedidos_db:
+  pagamento_db:
+  notificacao_db:
