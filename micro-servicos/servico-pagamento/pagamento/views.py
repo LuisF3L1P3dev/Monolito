@@ -15,17 +15,19 @@ class ProcessarPagamentoView(APIView):
         pedido_id = serializer.validated_data['pedido_id']
         valor = serializer.validated_data['valor']
 
-        # Idempotência: não reprocessa pedido já pago
-        transacao_existente = Transacao.objects.filter(pedido_id=pedido_id).first()
-        if transacao_existente and transacao_existente.status == 'APROVADO':
-            return Response({'sucesso': True, 'status': 'APROVADO', 'pedido_id': pedido_id})
-
-        transacao, _ = Transacao.objects.get_or_create(
+        # get_or_create é atômico: evita race condition entre requisições concorrentes.
+        # defaults só se aplica na criação; se já existir, verificamos o status abaixo.
+        transacao, criada = Transacao.objects.get_or_create(
             pedido_id=pedido_id,
-            defaults={'valor': valor},
+            defaults={'valor': valor, 'status': 'APROVADO'},
         )
-        transacao.status = 'APROVADO'
-        transacao.save(update_fields=['status'])
+
+        if not criada:
+            # Idempotência: pedido já aprovado, não republica na fila
+            if transacao.status == 'APROVADO':
+                return Response({'sucesso': True, 'status': 'APROVADO', 'pedido_id': pedido_id})
+            transacao.status = 'APROVADO'
+            transacao.save(update_fields=['status'])
 
         mensagem = f"Pedido #{pedido_id} confirmado (R$ {valor}). Preparar itens!"
         services.publicar_notificacao_fila(pedido_id, mensagem)

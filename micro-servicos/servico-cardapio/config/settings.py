@@ -1,8 +1,9 @@
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'servico-cardapio-secret-key-not-for-production'
+SECRET_KEY = os.getenv('SECRET_KEY', 'dev-insecure-cardapio-key-change-in-production')
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 

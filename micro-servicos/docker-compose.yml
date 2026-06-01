@@ -87,7 +87,8 @@ services:
   # Worker que consome a fila RabbitMQ e registra notificações
   notificacao-worker:
     build: ./servico-notificacao
-    command: sh -c "python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py consumir_fila"
+    # Não roda migrate aqui: servico-notificacao já aplicou no mesmo volume antes de ficar healthy
+    command: python manage.py consumir_fila
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     volumes:

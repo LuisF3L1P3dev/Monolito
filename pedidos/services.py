@@ -17,7 +17,7 @@ class PedidoService:
                         item_id=ip.item_cardapio_id,
                         nome=item_cardapio.nome,
                         quantidade=ip.quantidade,
-                        preco_unitario=item_cardapio.preco
+                        preco_unitario=ip.preco_unitario  # snapshot capturado no momento do pedido
                     ))
             
             return PedidoDTO(

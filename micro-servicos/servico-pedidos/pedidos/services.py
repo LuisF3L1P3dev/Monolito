@@ -21,11 +21,12 @@ def get_item_cardapio(item_id: int) -> dict | None:
 def processar_pagamento(pedido_id: int, valor) -> dict:
     """
     Chama o servico-pagamento com retry + backoff exponencial.
-    Retorna dict com 'sucesso' e 'mensagem'.
+    Erros 5xx são transientes (retenta). Erros 4xx são definitivos (não retenta).
     """
     url = f"{settings.PAGAMENTO_URL}/api/pagamentos/processar/"
     payload = {'pedido_id': pedido_id, 'valor': str(valor)}
     max_tentativas = 3
+    ultimo_erro = 'Serviço de pagamento indisponível'
 
     for tentativa in range(1, max_tentativas + 1):
         try:
@@ -33,18 +34,19 @@ def processar_pagamento(pedido_id: int, valor) -> dict:
             resp = requests.post(url, json=payload, timeout=HTTP_TIMEOUT)
             if resp.status_code == 200:
                 return {'sucesso': True, 'dados': resp.json()}
-            return {'sucesso': False, 'mensagem': f"Pagamento recusou com status {resp.status_code}"}
+            if resp.status_code < 500:
+                # 4xx: erro definitivo do cliente, não retenta
+                return {'sucesso': False, 'mensagem': f"Pagamento recusou com status {resp.status_code}"}
+            # 5xx: erro transiente do servidor, retenta
+            ultimo_erro = f"Erro {resp.status_code} no serviço de pagamento"
         except requests.exceptions.Timeout:
-            if tentativa < max_tentativas:
-                espera = 2 ** (tentativa - 1)  # 1s, 2s, 4s
-                print(f"[PEDIDOS] Timeout na tentativa {tentativa}. Aguardando {espera}s...")
-                time.sleep(espera)
-            else:
-                return {'sucesso': False, 'mensagem': 'Serviço de pagamento não respondeu após 3 tentativas'}
+            ultimo_erro = 'Timeout no serviço de pagamento'
         except requests.exceptions.ConnectionError:
-            if tentativa < max_tentativas:
-                espera = 2 ** (tentativa - 1)
-                print(f"[PEDIDOS] Conexão recusada na tentativa {tentativa}. Aguardando {espera}s...")
-                time.sleep(espera)
-            else:
-                return {'sucesso': False, 'mensagem': 'Serviço de pagamento indisponível'}
+            ultimo_erro = 'Serviço de pagamento indisponível'
+
+        if tentativa < max_tentativas:
+            espera = 2 ** (tentativa - 1)  # 1s, 2s
+            print(f"[PEDIDOS] {ultimo_erro} na tentativa {tentativa}. Aguardando {espera}s...")
+            time.sleep(espera)
+
+    return {'sucesso': False, 'mensagem': f"{ultimo_erro} após {max_tentativas} tentativas"}

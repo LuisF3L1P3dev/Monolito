@@ -1,7 +1,8 @@
-venv/
-migrations/
 **/__pycache__/
 *.pyc
 *.pyo
-db.sqlite3
+*.pyd
 .env
+db.sqlite3
+venv/
+.git/
