@@ -5,3 +5,4 @@ migrations/
 *.pyo
 db.sqlite3
 .env
+.idea
