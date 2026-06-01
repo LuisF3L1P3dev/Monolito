@@ -2,7 +2,7 @@ from django.views.generic import View
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
-from .services import PagamentoPadraoService # Poderia ser injetado ou via Factory
+from .services import PagamentoPadraoService, PagamentoRapidoService # Poderia ser injetado ou via Factory
 from pedidos.services import PedidoService
 from notificacao.services import NotificacaoService
 
