@@ -1,33 +1,27 @@
-import time
 from django.views.generic import View
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
-from pedidos.models import Pedido
-from pagamento.models import Transacao
-from notificacao.services import notificar_cozinha
+from .services import PagamentoPadraoService # Poderia ser injetado ou via Factory
+from pedidos.services import PedidoService
+from notificacao.services import NotificacaoService
 
 class ProcessarPagamentoView(View):
     def post(self, request, pedido_id):
-        pedido = get_object_or_404(Pedido, id=pedido_id)
+        # Busca dados via PedidoService (DTO)
+        pedido_dto = PedidoService.get_pedido_por_id(pedido_id)
+        if not pedido_dto:
+            return HttpResponseRedirect(reverse('pedidos-list'))
         
-        # Cria ou recupera a transação
-        transacao, _ = Transacao.objects.get_or_create(pedido=pedido)
-
-        # [CHECK-04] INJEÇÃO DE LATÊNCIA: simula a demora do pagamento
-        print(f"Processando pagamento do pedido #{pedido_id}... (Aguarde 5 segundos)")
-        time.sleep(5) 
+        # [EXPERIMENTO] Para trocar a implementação, altere a classe abaixo:
+        # PagamentoPadraoService() -> Possui delay de 5s
+        # PagamentoRapidoService() -> Sem delay
+        pagamento_service = PagamentoPadraoService()
         
-        # Simula a aprovação do pagamento
-        transacao.status = 'APROVADO'
-        transacao.save()
+        sucesso = pagamento_service.processar_pagamento(pedido_id, pedido_dto.total)
 
-        # Atualiza status do pedido indicando que está pago
-        pedido.status = 'PAGO'
-        pedido.save(update_fields=['status'])
-
-        # [CHECK-03] Chamada síncrona de notificação (acoplamento)
-        notificar_cozinha(pedido_id)
+        if sucesso:
+            # Notificação via Service
+            NotificacaoService.notificar_cozinha(pedido_id)
         
-        # Redireciona de volta para a lista de pedidos após finalizar
         return HttpResponseRedirect(reverse('pedidos-list'))
